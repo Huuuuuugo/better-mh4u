@@ -90,8 +90,8 @@ def get_items(image):
 
     # go through every item square until the last occupied one
     wait = 1/25
-    quick_press("-", wait)
-    quick_press("-", wait)
+    quick_press(key.f1, wait)
+    quick_press(key.f1, wait)
     quick_press(key.up, wait)
     quick_press("+", wait)
     time.sleep(wait)
@@ -180,7 +180,7 @@ if __name__ == "__main__":
                     keyboard.press("+")
                 
                 if event.button == 1:
-                    keyboard.press("-")
+                    keyboard.press(key.f1)
                 
             # if a button has been released
             elif event.type == pygame.JOYBUTTONUP:
@@ -201,7 +201,7 @@ if __name__ == "__main__":
                     keyboard.release("+")
 
                 if event.button == 1:
-                    keyboard.release("-")
+                    keyboard.release(key.f1)
 
         
         if not w32.IsWindow(primary_window._hWnd):

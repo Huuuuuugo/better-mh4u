@@ -17,7 +17,7 @@ pygame.init()
 pygame.joystick.init()
 
 
-def get_window(title_ending: str):
+def get_window(title_ending: str = None):
     """Gets the window object for the corresponding citra window.
 
     Atributes:
@@ -26,8 +26,12 @@ def get_window(title_ending: str):
         - Must be the exact string that appears at the end of the window title such as "Main Window" or "Secondary Window".
     """
 
+    if title_ending is None:
+        regex = r"^Citra Nightly [0-9]+.*"
+    else:
+        regex = r"^Citra Nightly [0-9]+ \| .* \| " + title_ending
+
     all_windows = gw.getAllWindows()
-    regex = r"^Citra Nightly [0-9]+ \| .* \| " + title_ending
     window: gw.Win32Window = None
 
     for window in all_windows:
@@ -107,105 +111,128 @@ def get_items(image):
 
 
 if __name__ == "__main__":
-    # get windows info
-    print("Searching for game window...")
-    while True:
-        primary_window = get_window("Janela Principal")
-        secondary_window = get_window("Janela Secundária")
-        if not (primary_window and secondary_window):
+    timeout = 10
+    print("Waiting for Citra window to be openned (timeout in 10 seconds)...")
+    while not get_window():
+        time.sleep(0.5)
+        timeout -= 0.5
+        if timeout <= 0:
+            exit("Citra window not found!")
+
+    print("Citra window found!")
+
+    while get_window():
+        # get windows info
+        print("Searching for game window...")
+        while True:
+            primary_window = get_window("Janela Principal")
+            secondary_window = get_window("Janela Secundária")
+            if not (primary_window and secondary_window):
+                time.sleep(0.5)
+            else:
+                break
+
+            if not get_window():
+                exit("Citra window closed!")
+
+        print("Game window found!")
+
+        # remove round borders and resize secondary window
+        set_square_edges(secondary_window._hWnd)
+
+        height = 550 - secondary_window.height
+        width = 725 - secondary_window.width
+        top = 530 - secondary_window.top
+        left = 0 - secondary_window.left
+
+        secondary_window.resize(width, height)
+        secondary_window.move(left, top)
+
+        # gamepad info
+        gamepad_id = 0
+        button_id = 5
+
+        # read input from gamepad
+        print("Waiting for gamepad...")
+        gamepad = None
+        while not pygame.joystick.get_count():
+            if not w32.IsWindow(primary_window._hWnd):
+                break
             time.sleep(0.5)
         else:
-            break
+            gamepad = pygame.joystick.Joystick(gamepad_id)
 
-    print("Game window found!")
-
-    # remove round borders and resize secondary window
-    set_square_edges(secondary_window._hWnd)
-
-    height = 550 - secondary_window.height
-    width = 725 - secondary_window.width
-    top = 530 - secondary_window.top
-    left = 0 - secondary_window.left
-
-    secondary_window.resize(width, height)
-    secondary_window.move(left, top)
-
-    # gamepad info
-    gamepad_id = 0
-    button_id = 5
-
-    # read input from gamepad
-    print("Waiting for gamepad...")
-    while not pygame.joystick.get_count():
-        time.sleep(0.5)
-
-    gamepad = pygame.joystick.Joystick(gamepad_id)
-
-    print("Gamepad found!")
-
-    while True:
-        for event in pygame.event.get():
-            # if a button has been pressed
-            if event.type == pygame.JOYBUTTONDOWN:
-                # if home button is pressed
-                if event.button == button_id:
-                    active_window = gw.getActiveWindow()
-                    if active_window._hWnd == primary_window._hWnd:
-                        # primary_window.activate()
-                        secondary_window.activate()
-
-                    elif active_window._hWnd == secondary_window._hWnd:
-                        # secondary_window.minimize()
-                        primary_window.activate()
-                
-                # if screenshot button is pressed
-                if event.button == 15:
-                    image = screen_shot()
-                    get_items(image)
-
-                # if up, down, left, right, A or B is pressed
-                if event.button == 11:
-                    keyboard.press(key.up)
-
-                if event.button == 12:
-                    keyboard.press(key.down)
-
-                if event.button == 13:
-                    keyboard.press(key.left)
-
-                if event.button == 14:
-                    keyboard.press(key.right)
-                
-                if event.button == 0:
-                    keyboard.press("+")
-                
-                if event.button == 1:
-                    keyboard.press(key.f1)
-                
-            # if a button has been released
-            elif event.type == pygame.JOYBUTTONUP:
-                # if up, down, left, right, A or B is released
-                if event.button == 11:
-                    keyboard.release(key.up)
-
-                if event.button == 12:
-                    keyboard.release(key.down)
-
-                if event.button == 13:
-                    keyboard.release(key.left)
-
-                if event.button == 14:
-                    keyboard.release(key.right)
-                
-                if event.button == 0:
-                    keyboard.release("+")
-
-                if event.button == 1:
-                    keyboard.release(key.f1)
-
-        
-        if not w32.IsWindow(primary_window._hWnd):
+        if gamepad is None:
             print("Game window closed!")
-            exit()
-        
-        time.sleep(1/60)
+            continue
+
+        print("Gamepad found!")
+
+        print("Playing!")
+        while True:
+            for event in pygame.event.get():
+                # if a button has been pressed
+                if event.type == pygame.JOYBUTTONDOWN:
+                    # if home button is pressed
+                    if event.button == button_id:
+                        active_window = gw.getActiveWindow()
+                        if active_window._hWnd == primary_window._hWnd:
+                            # primary_window.activate()
+                            secondary_window.activate()
+
+                        elif active_window._hWnd == secondary_window._hWnd:
+                            # secondary_window.minimize()
+                            primary_window.activate()
+                    
+                    # if screenshot button is pressed
+                    if event.button == 15:
+                        image = screen_shot()
+                        get_items(image)
+
+                    # if up, down, left, right, A or B is pressed
+                    if event.button == 11:
+                        keyboard.press(key.up)
+
+                    if event.button == 12:
+                        keyboard.press(key.down)
+
+                    if event.button == 13:
+                        keyboard.press(key.left)
+
+                    if event.button == 14:
+                        keyboard.press(key.right)
+                    
+                    if event.button == 0:
+                        keyboard.press("+")
+                    
+                    if event.button == 1:
+                        keyboard.press(key.f1)
+                    
+                # if a button has been released
+                elif event.type == pygame.JOYBUTTONUP:
+                    # if up, down, left, right, A or B is released
+                    if event.button == 11:
+                        keyboard.release(key.up)
+
+                    if event.button == 12:
+                        keyboard.release(key.down)
+
+                    if event.button == 13:
+                        keyboard.release(key.left)
+
+                    if event.button == 14:
+                        keyboard.release(key.right)
+                    
+                    if event.button == 0:
+                        keyboard.release("+")
+
+                    if event.button == 1:
+                        keyboard.release(key.f1)
+
+            
+            if not w32.IsWindow(primary_window._hWnd):
+                print("Game window closed!")
+                break
+            
+            time.sleep(1/60)
+    exit("Citra window closed!")

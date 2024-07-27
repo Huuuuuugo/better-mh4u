@@ -6,15 +6,23 @@ import re
 import pygetwindow as gw
 import win32gui as w32
 import numpy as np
+import colorama
 import pynput
 import pygame
 import cv2
+
+colorama.init()
+Fore = colorama.Fore
+Style = colorama.Style
 
 keyboard = pynput.keyboard.Controller()
 key = pynput.keyboard.Key
 
 pygame.init()
 pygame.joystick.init()
+
+A_BUTTON = "+"
+B_BUTTON = key.f1
 
 
 def get_window(title_ending: str = None):
@@ -73,6 +81,8 @@ def screen_shot():
     return cv2.threshold(screen_shot, 70, 255, cv2.THRESH_BINARY)[1]
 
 def get_items(image):
+    # TODO: update it to support other types of item boxes (cat gathering, bonus rewards, multiply, )
+    # TODO: make it only check for item when some type of item box is open
     # get item square dimensions and offset to center
     img_h, img_w = image.shape[:2]
 
@@ -94,14 +104,14 @@ def get_items(image):
 
     # go through every item square until the last occupied one
     wait = 1/25
-    quick_press(key.f1, wait)
-    quick_press(key.f1, wait)
+    quick_press(B_BUTTON, wait)
+    quick_press(B_BUTTON, wait)
     quick_press(key.up, wait)
-    quick_press("+", wait)
+    quick_press(A_BUTTON, wait)
     time.sleep(wait)
     for line in range(last_item[0]):
         for column in range(8):
-            quick_press("+", wait)
+            quick_press(A_BUTTON, wait)
             quick_press(key.right, wait)
             if line == last_item[0] - 1 and column == last_item[1] - 1:
                 break
@@ -112,18 +122,18 @@ def get_items(image):
 
 if __name__ == "__main__":
     timeout = 10
-    print("Waiting for Citra window to be openned (timeout in 10 seconds)...")
+    print(Fore.YELLOW + "Waiting for Citra window to be openned (timeout in 10 seconds)..." + Style.RESET_ALL)
     while not get_window():
         time.sleep(0.5)
         timeout -= 0.5
         if timeout <= 0:
-            exit("Citra window not found!")
+            exit(Fore.RED + "Citra window not found!" + Style.RESET_ALL)
 
-    print("Citra window found!")
+    print(Fore.GREEN + "Citra window found!" + Style.RESET_ALL)
 
     while get_window():
         # get windows info
-        print("Searching for game window...")
+        print(Fore.YELLOW + "Searching for game window..." + Style.RESET_ALL)
         while True:
             primary_window = get_window("Janela Principal")
             secondary_window = get_window("Janela Secundária")
@@ -133,9 +143,9 @@ if __name__ == "__main__":
                 break
 
             if not get_window():
-                exit("Citra window closed!")
+                exit(Fore.RED + "Citra window closed!" + Style.RESET_ALL)
 
-        print("Game window found!")
+        print(Fore.GREEN + "Game window found!" + Style.RESET_ALL)
 
         # remove round borders and resize secondary window
         set_square_edges(secondary_window._hWnd)
@@ -153,7 +163,7 @@ if __name__ == "__main__":
         button_id = 5
 
         # read input from gamepad
-        print("Waiting for gamepad...")
+        print(Fore.YELLOW + "Waiting for gamepad..." + Style.RESET_ALL)
         gamepad = None
         while not pygame.joystick.get_count():
             if not w32.IsWindow(primary_window._hWnd):
@@ -163,12 +173,13 @@ if __name__ == "__main__":
             gamepad = pygame.joystick.Joystick(gamepad_id)
 
         if gamepad is None:
-            print("Game window closed!")
+            print(Fore.RED + "Game window closed!" + Style.RESET_ALL)
+            print(Fore.YELLOW + "Restarting..." + Style.RESET_ALL)
             continue
 
-        print("Gamepad found!")
+        print(Fore.GREEN + "Gamepad found!" + Style.RESET_ALL)
 
-        print("Playing!")
+        print(Fore.GREEN + "Playing!" + Style.RESET_ALL)
         while True:
             for event in pygame.event.get():
                 # if a button has been pressed
@@ -203,10 +214,10 @@ if __name__ == "__main__":
                         keyboard.press(key.right)
                     
                     if event.button == 0:
-                        keyboard.press("+")
+                        keyboard.press(A_BUTTON)
                     
                     if event.button == 1:
-                        keyboard.press(key.f1)
+                        keyboard.press(B_BUTTON)
                     
                 # if a button has been released
                 elif event.type == pygame.JOYBUTTONUP:
@@ -224,15 +235,21 @@ if __name__ == "__main__":
                         keyboard.release(key.right)
                     
                     if event.button == 0:
-                        keyboard.release("+")
+                        keyboard.release(A_BUTTON)
 
                     if event.button == 1:
-                        keyboard.release(key.f1)
+                        keyboard.release(B_BUTTON)
 
             
             if not w32.IsWindow(primary_window._hWnd):
-                print("Game window closed!")
+                print(Fore.RED + "Game window closed!" + Style.RESET_ALL)
+                print(Fore.YELLOW + "Restarting..." + Style.RESET_ALL)
+                break
+
+            if not pygame.joystick.get_count():
+                print(Fore.RED + "Gamepad disconnected!" + Style.RESET_ALL)
+                print(Fore.YELLOW + "Restarting..." + Style.RESET_ALL)
                 break
             
             time.sleep(1/60)
-    exit("Citra window closed!")
+    exit(Fore.RED + "Citra window closed!" + Style.RESET_ALL)

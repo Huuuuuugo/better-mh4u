@@ -1,7 +1,5 @@
 import pyautogui
-import ctypes
 import time
-import re
 
 import pygetwindow as gw
 import win32gui as w32
@@ -10,6 +8,8 @@ import colorama
 import pynput
 import pygame
 import cv2
+
+from window_utils import get_citra_window, set_square_edges
 
 colorama.init()
 Fore = colorama.Fore
@@ -24,40 +24,6 @@ pygame.joystick.init()
 A_BUTTON = "+"
 B_BUTTON = key.f1
 
-
-def get_window(title_ending: str = None):
-    """Gets the window object for the corresponding citra window.
-
-    Atributes:
-    ---------
-    title_ending: str
-        - Must be the exact string that appears at the end of the window title such as "Main Window" or "Secondary Window".
-    """
-
-    if title_ending is None:
-        regex = r"^Citra Nightly [0-9]+.*"
-    else:
-        regex = r"^Citra Nightly [0-9]+ \| .* \| " + title_ending
-
-    all_windows = gw.getAllWindows()
-    window: gw.Win32Window = None
-
-    for window in all_windows:
-        if re.match(regex, window.title):
-            return window
-        
-def set_square_edges(hwnd):
-    # constants for window style
-    GWL_STYLE = -16
-    WS_BORDER = 0x00800000
-    WS_OVERLAPPEDWINDOW = 0x00CF0000
-
-    # Get the current window style
-    style = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_STYLE)
-    
-    # Modify the window style to have squared borders
-    new_style = style & ~WS_OVERLAPPEDWINDOW | WS_BORDER
-    ctypes.windll.user32.SetWindowLongW(hwnd, GWL_STYLE, new_style)
 
 def quick_press(key, wait):
     keyboard.press(key)
@@ -123,7 +89,7 @@ def get_items(image):
 if __name__ == "__main__":
     timeout = 10
     print(Fore.YELLOW + "Waiting for Citra window to be openned (timeout in 10 seconds)..." + Style.RESET_ALL)
-    while not get_window():
+    while not get_citra_window():
         time.sleep(0.5)
         timeout -= 0.5
         if timeout <= 0:
@@ -131,18 +97,18 @@ if __name__ == "__main__":
 
     print(Fore.GREEN + "Citra window found!" + Style.RESET_ALL)
 
-    while get_window():
+    while get_citra_window():
         # get windows info
         print(Fore.YELLOW + "Searching for game window..." + Style.RESET_ALL)
         while True:
-            primary_window = get_window("Janela Principal")
-            secondary_window = get_window("Janela Secundária")
+            primary_window = get_citra_window("Janela Principal")
+            secondary_window = get_citra_window("Janela Secundária")
             if not (primary_window and secondary_window):
                 time.sleep(0.5)
             else:
                 break
 
-            if not get_window():
+            if not get_citra_window():
                 exit(Fore.RED + "Citra window closed!" + Style.RESET_ALL)
 
         print(Fore.GREEN + "Game window found!" + Style.RESET_ALL)

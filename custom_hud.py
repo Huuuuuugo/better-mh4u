@@ -7,30 +7,36 @@ from window_utils import *
 
 class DisplayImage():
     health_bar_color = np.array((49, 203, 24)) # green
+    poison_color = np.array((200, 3, 192))
     black_color = np.array((0, 0, 0))
+    prev_img_arr = np.array((0, 0, 0))
     toggle_tk_window = False
+    hide_delay_timer = time.perf_counter()
+    startup = False
+
+    @classmethod
+    def start_window(cls, image):
+        tk_window = []
+        while not tk_window:
+            tk_window: gw.Win32Window = gw.getWindowsWithTitle("Display Image")
+            
+        time.sleep(0.5)
+
+        tk_window = tk_window[0]
+        set_window_opacity(tk_window._hWnd, 0.35)
+        set_always_on_top(tk_window._hWnd)
+
+        # wait for user to move window
+        set_square_edges(tk_window._hWnd)
+
+        # resize window
+        img_w, img_h = image.size
+        height = img_h - tk_window.height
+        width = img_w - tk_window.width
+        tk_window.resize(width, height)
 
     @classmethod
     def start(cls, window):
-        def start_window():
-            time.sleep(0.5)
-            tk_window: gw.Win32Window = gw.getWindowsWithTitle("Display Image")[0]
-            time.sleep(0.2)
-            set_window_opacity(tk_window._hWnd, 0.35)
-            time.sleep(0.2)
-            set_always_on_top(tk_window._hWnd)
-            time.sleep(0.2)
-
-            # wait for user to move window
-            set_square_edges(tk_window._hWnd)
-            time.sleep(0.2)
-
-            # resize window
-            img_w, img_h = image.size
-            height = img_h - tk_window.height
-            width = img_w - tk_window.width
-            tk_window.resize(width, height)
-
         def get_image():
             # take screenshot
             image = background_screenshot(window._hWnd, window.width, window.height)
@@ -53,20 +59,25 @@ class DisplayImage():
 
             # TODO: create mask to only include the relevant portions of the image
 
-            # image.save("ignore/__status.png")
+            image.save("ignore/__status.png")
             return image
         
         def update_image():
             # get image
             image = get_image()
 
+            if cls.startup:
+                cls.start_window(image)
+                cls.startup = False
+
             # test if image contains status hud
             img_arr = np.array(image)
 
             health_match = np.any(np.all(img_arr == cls.health_bar_color, axis=-1))
+            poison_match = np.any(np.all(img_arr == cls.poison_color, axis=-1))
             black_match = np.any(np.all(img_arr == cls.black_color, axis=-1))
 
-            if health_match and black_match:
+            if (health_match or poison_match) and black_match:
                 # get window back into view
                 if cls.toggle_tk_window:
                     tk_window: gw.Win32Window = gw.getWindowsWithTitle("Display Image")
@@ -109,7 +120,7 @@ class DisplayImage():
         label.pack()
 
         update_image()
-        threading.Thread(target=start_window, daemon=True).start()
+        cls.startup = True
 
         root.mainloop()
 

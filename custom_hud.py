@@ -5,6 +5,30 @@ import numpy as np
 
 from window_utils import *
 
+
+def remove_color_range(image: Image, color, tolerance):
+    # convert image to RGBA
+    if image.mode != "RGBA":
+        image = image.convert("RGBA")
+
+    # turn image into array
+    img_arr = np.array(image)
+    # print(img_arr[0][0])
+
+    # get color range limits
+    upper_bound = np.concatenate((np.array(color)[:] + tolerance, (255,)), axis=0)
+    lower_bound = np.concatenate((np.array(color)[:] - tolerance, (0,)), axis=0)
+    # print(upper_bound)
+    # print(lower_bound)
+
+    # get images within range and apply mask to orinal image
+    mask_arr = np.all((img_arr >= lower_bound) & (img_arr <= upper_bound), axis=-1)
+    img_arr[mask_arr] = [0, 0, 0, 0]
+
+    # turn into PIL Image and return
+    return Image.fromarray(img_arr, "RGBA")
+
+
 class DisplayImage():
     health_bar_color = np.array((49, 203, 24)) # green
     poison_color = np.array((200, 3, 192))
@@ -13,6 +37,8 @@ class DisplayImage():
     toggle_tk_window = False
     hide_delay_timer = time.perf_counter()
     startup = False
+
+    mask = Image.open("ignore/status/status_mask_v3.png")
 
     @classmethod
     def start_window(cls, image):
@@ -23,17 +49,8 @@ class DisplayImage():
         time.sleep(0.5)
 
         tk_window = tk_window[0]
-        set_window_opacity(tk_window._hWnd, 0.35)
+        # set_window_opacity(tk_window._hWnd, 0.7)
         set_always_on_top(tk_window._hWnd)
-
-        # wait for user to move window
-        set_square_edges(tk_window._hWnd)
-
-        # resize window
-        img_w, img_h = image.size
-        height = img_h - tk_window.height
-        width = img_w - tk_window.width
-        tk_window.resize(width, height)
 
     @classmethod
     def start(cls, window):
@@ -57,11 +74,10 @@ class DisplayImage():
             lower = upper + img_h//3
             image = image.crop([left, upper, right, lower])
 
-            # TODO: create mask to only include the relevant portions of the image
-
-            image.save("ignore/__status.png")
+            # image.save("ignore/__status.png")
             return image
         
+        cls.toggle_tk_window = True
         def update_image():
             # get image
             image = get_image()
@@ -71,20 +87,20 @@ class DisplayImage():
                 cls.startup = False
 
             # test if image contains status hud
-            img_arr = np.array(image)
+            new_img = Image.new("RGBA", image.size)
+            new_img.paste(image, mask=cls.mask)
+            image = new_img
 
-            health_match = np.any(np.all(img_arr == cls.health_bar_color, axis=-1))
-            poison_match = np.any(np.all(img_arr == cls.poison_color, axis=-1))
-            black_match = np.any(np.all(img_arr == cls.black_color, axis=-1))
+            image = remove_color_range(image, (155, 130, 100), 35)
 
-            if (health_match or poison_match) and black_match:
+            if True:
                 # get window back into view
                 if cls.toggle_tk_window:
                     tk_window: gw.Win32Window = gw.getWindowsWithTitle("Display Image")
                     if tk_window:
                         tk_window = tk_window[0]
-                        top = 595 - tk_window.top
-                        left = 935 - tk_window.left
+                        top = 605 - tk_window.top
+                        left = 905 - tk_window.left
                         time.sleep(0.1)
                         tk_window.move(left, top)
                         cls.toggle_tk_window = False
@@ -115,9 +131,12 @@ class DisplayImage():
         image = get_image()
 
         tk_image = ImageTk.PhotoImage(image)
-        label = tk.Label(root, image=tk_image)
+        label = tk.Label(root, image=tk_image, bg=root['bg'])
         label.image = tk_image  # Keep a reference to avoid garbage collection
         label.pack()
+
+        root.overrideredirect(True)
+        root.attributes('-alpha', 0.75)
 
         update_image()
         cls.startup = True
@@ -128,7 +147,7 @@ if __name__ == "__main__":
     # debug thread
     def debug():
         time.sleep(3)
-        # tk_window: gw.Win32Window = gw.getWindowsWithTitle("Display Image")[0]
+        tk_window: gw.Win32Window = gw.getWindowsWithTitle("Display Image")[0]
         while True:
             command = input("command: ")
             try:

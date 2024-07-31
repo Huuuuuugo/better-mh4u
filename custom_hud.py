@@ -6,6 +6,8 @@ import numpy as np
 from window_utils import *
 
 KEEP_CLOCK_ON_HUD = False
+HIDE_HUD_DELAY = 2
+
 
 def has_color(image: Image, color, tolerance, section: tuple | None = None):
     # convert image to RGBA
@@ -60,6 +62,11 @@ class DisplayImage():
     else:
         mask = Image.open("__status_mask_clean.png")
 
+    prev_health_stamina_img = np.array(mask)[10: 10+20, 100:]
+    prev_health_stamina_img = prev_health_stamina_img[:, :, :3]
+    
+    hud_timer = 0
+
     @classmethod
     def check_for_player(cls, image):
         # checks if any of the player colors is found within the section that shows the weapon
@@ -99,17 +106,48 @@ class DisplayImage():
 
             # test if image contains status hud
             if cls.check_for_player(image):
-                # get window back into view
-                if cls.toggle_tk_window:
-                    tk_window: gw.Win32Window = gw.getWindowsWithTitle("Display Image")
-                    if tk_window:
-                        tk_window = tk_window[0]
-                        top = 605 - tk_window.top
-                        left = 905 - tk_window.left
-                        tk_window.move(left, top)
-                        cls.toggle_tk_window = False
+                # isolate portion of the image containing health and stamina
+                health_stamina_img = np.array(image)[10: 10+20, 100:]
+                
+                # get difference between current and previous health_stamina_img
+                difference = np.all((cls.prev_health_stamina_img != health_stamina_img), axis=-1)
+                difference = np.sum(difference)
+                print(difference)
+
+                # update previous value
+                cls.prev_health_stamina_img = health_stamina_img
+
+                # if the difference is grater than a given threshold
+                if difference > 5:
+                    # restart timer
+                    cls.hud_timer = time.perf_counter()
+
+                    # get window back into view
+                    if cls.toggle_tk_window:
+                        tk_window: gw.Win32Window = gw.getWindowsWithTitle("Display Image")
+                        if tk_window:
+                            tk_window = tk_window[0]
+                            top = 605 - tk_window.top
+                            left = 905 - tk_window.left
+                            tk_window.move(left, top)
+                            cls.toggle_tk_window = False
+                
+                # if there's no significant difference and HIDE_HUD_DELAY has be reached
+                elif (time.perf_counter() - cls.hud_timer) >= HIDE_HUD_DELAY:
+                    # hide window
+                    if not cls.toggle_tk_window:
+                        tk_window: gw.Win32Window = gw.getWindowsWithTitle("Display Image")
+                        if tk_window:
+                            tk_window = tk_window[0]
+                            top = 1080 - tk_window.top
+                            left = 1920 - tk_window.left
+                            tk_window.move(left, top)
+                            cls.toggle_tk_window = True
                 
                 # remove unnecessary portions of the image
+                # TODO: make it interfere as least as possible with the actual hud elements
+                #   it currently messes with the color of health bar when poisoned
+                #   it also keeps some portions unchanged at some lower ranges
                 new_img = Image.new("RGBA", image.size)
                 new_img.paste(image, mask=cls.mask)
                 image = new_img
@@ -121,6 +159,7 @@ class DisplayImage():
                 label.config(image=tk_image)
                 label.image = tk_image
 
+            # if image does not contain hud
             else:
                 # hide window
                 if not cls.toggle_tk_window:
@@ -137,10 +176,10 @@ class DisplayImage():
         # Create a new Tkinter window
         root = tk.Tk()
         root.title("Display Image")
-        root.attributes('-transparentcolor', root['bg']) # make window transparent
-        root.overrideredirect(True) # removes window decorations
-        root.attributes('-alpha', 0.75) # makes the window transparent
-        root.wm_attributes("-topmost", 1)  # makes the window always on top
+        root.attributes('-transparentcolor', root['bg']) # make window properly display transparent images
+        root.overrideredirect(True) # remove window decorations
+        root.attributes('-alpha', 0.75) # make the window transparent
+        root.wm_attributes("-topmost", 1)  # make the window stay always on top
 
         image = get_image()
 

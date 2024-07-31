@@ -5,6 +5,7 @@ import cv2
 
 
 def remove_color_range(image: Image, color, tolerance):
+    # TODO: try using cv2's morph closing
     # convert image to RGBA
     if image.mode != "RGBA":
         image = image.convert("RGBA")
@@ -16,8 +17,13 @@ def remove_color_range(image: Image, color, tolerance):
     upper_bound = np.concatenate((np.array(color)[:] + tolerance, (255,)), axis=0)
     lower_bound = np.concatenate((np.array(color)[:] - tolerance, (0,)), axis=0)
 
+    # apply morphological operation
+    kernel = np.ones((5, 5), np.uint8)
+    close_arr = cv2.morphologyEx(img_arr, cv2.MORPH_ERODE, kernel)
+
     # get images within range and apply mask to orinal image
-    mask_arr = np.all((img_arr >= lower_bound) & (img_arr <= upper_bound), axis=-1)
+    mask_arr = np.all((close_arr >= lower_bound) & (close_arr <= upper_bound), axis=-1)
+
     img_arr[mask_arr] = [0, 0, 0, 0]
 
     # turn into PIL Image and return
@@ -33,6 +39,8 @@ for file in os.listdir(path):
     timer = time.perf_counter()
     image = image.filter(ImageFilter.SHARPEN())
     print(f"{path}/{file}")
+    image = remove_color_range(image, (160, 130, 88), 60) # (140, 158, 123)
+
 
     # base mask
     new_img = Image.new("RGBA", image.size)
@@ -40,7 +48,6 @@ for file in os.listdir(path):
     image = new_img
     
     # apply remove color mask
-    image = remove_color_range(image, (160, 130, 88), 60) # (140, 158, 123)
     print(time.perf_counter() - timer)
     
     image.save(f"{path}/__image.png")

@@ -5,6 +5,27 @@ import numpy as np
 
 from window_utils import *
 
+KEEP_CLOCK_ON_HUD = False
+
+def has_color(image: Image, color, tolerance, section: tuple | None = None):
+    # convert image to RGBA
+    if image.mode != "RGBA":
+        image = image.convert("RGBA")
+
+    # turn image into array
+    img_arr = np.array(image)
+
+    # get section of the image if it is set
+    if section is not None:
+        top, left, height, width = section
+        img_arr = img_arr[top: top+height, left: left+width]
+
+    # get color range limits
+    upper_bound = np.concatenate((np.array(color)[:] + tolerance, (255,)), axis=0)
+    lower_bound = np.concatenate((np.array(color)[:] - tolerance, (0,)), axis=0)
+
+    # get pixels within bounds and return True if any is found
+    return np.any(np.all((img_arr >= lower_bound) & (img_arr <= upper_bound), axis=-1), axis=None)
 
 def remove_color_range(image: Image, color, tolerance):
     # convert image to RGBA
@@ -13,13 +34,10 @@ def remove_color_range(image: Image, color, tolerance):
 
     # turn image into array
     img_arr = np.array(image)
-    # print(img_arr[0][0])
 
     # get color range limits
     upper_bound = np.concatenate((np.array(color)[:] + tolerance, (255,)), axis=0)
     lower_bound = np.concatenate((np.array(color)[:] - tolerance, (0,)), axis=0)
-    # print(upper_bound)
-    # print(lower_bound)
 
     # get images within range and apply mask to orinal image
     mask_arr = np.all((img_arr >= lower_bound) & (img_arr <= upper_bound), axis=-1)
@@ -30,27 +48,25 @@ def remove_color_range(image: Image, color, tolerance):
 
 
 class DisplayImage():
-    health_bar_color = np.array((49, 203, 24)) # green
-    poison_color = np.array((200, 3, 192))
-    black_color = np.array((0, 0, 0))
-    prev_img_arr = np.array((0, 0, 0))
-    toggle_tk_window = False
-    hide_delay_timer = time.perf_counter()
-    startup = False
+    p1_color = (180, 30, 15) # red
+    p2_color = (50, 175, 175) # cyan
+    p3_color = (235, 230, 10) # yellow
+    p4_color = (10, 205, 10) # green
 
-    mask = Image.open("ignore/status/status_mask_v3.png")
+    toggle_tk_window = False
+
+    if KEEP_CLOCK_ON_HUD:
+        mask = Image.open("__status_mask_clock.png")
+    else:
+        mask = Image.open("__status_mask_clean.png")
 
     @classmethod
-    def start_window(cls, image):
-        tk_window = []
-        while not tk_window:
-            tk_window: gw.Win32Window = gw.getWindowsWithTitle("Display Image")
-            
-        time.sleep(0.5)
-
-        tk_window = tk_window[0]
-        # set_window_opacity(tk_window._hWnd, 0.7)
-        set_always_on_top(tk_window._hWnd)
+    def check_for_player(cls, image):
+        # checks if any of the player colors is found within the section that shows the weapon
+        return (has_color(image, cls.p1_color, 30, (100, 10, 30, 30)) or 
+                has_color(image, cls.p2_color, 30, (100, 10, 30, 30)) or
+                has_color(image, cls.p3_color, 30, (100, 10, 30, 30)) or
+                has_color(image, cls.p4_color, 30, (100, 10, 30, 30)))
 
     @classmethod
     def start(cls, window):
@@ -77,23 +93,12 @@ class DisplayImage():
             # image.save("ignore/__status.png")
             return image
         
-        cls.toggle_tk_window = True
         def update_image():
             # get image
             image = get_image()
 
-            if cls.startup:
-                cls.start_window(image)
-                cls.startup = False
-
             # test if image contains status hud
-            new_img = Image.new("RGBA", image.size)
-            new_img.paste(image, mask=cls.mask)
-            image = new_img
-
-            image = remove_color_range(image, (155, 130, 100), 35)
-
-            if True:
+            if cls.check_for_player(image):
                 # get window back into view
                 if cls.toggle_tk_window:
                     tk_window: gw.Win32Window = gw.getWindowsWithTitle("Display Image")
@@ -101,10 +106,17 @@ class DisplayImage():
                         tk_window = tk_window[0]
                         top = 605 - tk_window.top
                         left = 905 - tk_window.left
-                        time.sleep(0.1)
                         tk_window.move(left, top)
                         cls.toggle_tk_window = False
+                
+                # remove unnecessary portions of the image
+                new_img = Image.new("RGBA", image.size)
+                new_img.paste(image, mask=cls.mask)
+                image = new_img
 
+                image = remove_color_range(image, (155, 130, 100), 35)
+
+                # update tkinter window
                 tk_image = ImageTk.PhotoImage(image)
                 label.config(image=tk_image)
                 label.image = tk_image
@@ -117,7 +129,6 @@ class DisplayImage():
                         tk_window = tk_window[0]
                         top = 1080 - tk_window.top
                         left = 1920 - tk_window.left
-                        time.sleep(0.1)
                         tk_window.move(left, top)
                         cls.toggle_tk_window = True
 
@@ -126,7 +137,10 @@ class DisplayImage():
         # Create a new Tkinter window
         root = tk.Tk()
         root.title("Display Image")
-        root.attributes('-transparentcolor', root['bg'])
+        root.attributes('-transparentcolor', root['bg']) # make window transparent
+        root.overrideredirect(True) # removes window decorations
+        root.attributes('-alpha', 0.75) # makes the window transparent
+        root.wm_attributes("-topmost", 1)  # makes the window always on top
 
         image = get_image()
 
@@ -135,11 +149,7 @@ class DisplayImage():
         label.image = tk_image  # Keep a reference to avoid garbage collection
         label.pack()
 
-        root.overrideredirect(True)
-        root.attributes('-alpha', 0.75)
-
         update_image()
-        cls.startup = True
 
         root.mainloop()
 

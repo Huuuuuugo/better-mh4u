@@ -1,12 +1,15 @@
+from PIL import Image, ImageFilter
 import time
 
 import pygetwindow as gw
 import numpy as np
+import cv2
 
 from window_utils import *
 
 KEEP_CLOCK_ON_HUD = False
 HIDE_HUD_DELAY = 2
+HUD_UPDATE_DELAY = 100
 
 
 def has_color(image: Image, color, tolerance, section: tuple | None = None):
@@ -41,8 +44,13 @@ def remove_color_range(image: Image, color, tolerance):
     upper_bound = np.concatenate((np.array(color)[:] + tolerance, (255,)), axis=0)
     lower_bound = np.concatenate((np.array(color)[:] - tolerance, (0,)), axis=0)
 
+    # apply morphological operation
+    kernel = np.ones((3, 3), np.uint8)
+    close_arr = cv2.morphologyEx(img_arr, cv2.MORPH_CLOSE, kernel)
+
     # get images within range and apply mask to orinal image
-    mask_arr = np.all((img_arr >= lower_bound) & (img_arr <= upper_bound), axis=-1)
+    mask_arr = np.all((close_arr >= lower_bound) & (close_arr <= upper_bound), axis=-1)
+
     img_arr[mask_arr] = [0, 0, 0, 0]
 
     # turn into PIL Image and return
@@ -112,7 +120,6 @@ class DisplayImage():
                 # get difference between current and previous health_stamina_img
                 difference = np.all((cls.prev_health_stamina_img != health_stamina_img), axis=-1)
                 difference = np.sum(difference)
-                print(difference)
 
                 # update previous value
                 cls.prev_health_stamina_img = health_stamina_img
@@ -145,14 +152,12 @@ class DisplayImage():
                             cls.toggle_tk_window = True
                 
                 # remove unnecessary portions of the image
-                # TODO: make it interfere as least as possible with the actual hud elements
-                #   it currently messes with the color of health bar when poisoned
-                #   it also keeps some portions unchanged at some lower ranges
+                image = image.filter(ImageFilter.SHARPEN())
+                image = remove_color_range(image, (155, 130, 100), 40)
+
                 new_img = Image.new("RGBA", image.size)
                 new_img.paste(image, mask=cls.mask)
                 image = new_img
-
-                image = remove_color_range(image, (155, 130, 100), 35)
 
                 # update tkinter window
                 tk_image = ImageTk.PhotoImage(image)
@@ -171,7 +176,7 @@ class DisplayImage():
                         tk_window.move(left, top)
                         cls.toggle_tk_window = True
 
-            label.after(100, update_image)
+            label.after(HUD_UPDATE_DELAY, update_image)
 
         # Create a new Tkinter window
         root = tk.Tk()

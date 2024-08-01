@@ -32,7 +32,7 @@ def has_color(image: Image, color, tolerance, section: tuple | None = None):
     # get pixels within bounds and return True if any is found
     return np.any(np.all((img_arr >= lower_bound) & (img_arr <= upper_bound), axis=-1), axis=None)
 
-def remove_color_range(image: Image, color, tolerance):
+def remove_color(image: Image, color, tolerance):
     # convert image to RGBA
     if image.mode != "RGBA":
         image = image.convert("RGBA")
@@ -44,16 +44,22 @@ def remove_color_range(image: Image, color, tolerance):
     upper_bound = np.concatenate((np.array(color)[:] + tolerance, (255,)), axis=0)
     lower_bound = np.concatenate((np.array(color)[:] - tolerance, (0,)), axis=0)
 
-    # apply morphological operation
+    # create mask from in bound pixels
+    mask = cv2.inRange(img_arr, lower_bound, upper_bound)
+
+    # apply morphological operations
     kernel = np.ones((3, 3), np.uint8)
-    close_arr = cv2.morphologyEx(img_arr, cv2.MORPH_CLOSE, kernel)
 
-    # get images within range and apply mask to orinal image
-    mask_arr = np.all((close_arr >= lower_bound) & (close_arr <= upper_bound), axis=-1)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel) # remove small noise
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel) # cover small holes
+    mask = cv2.GaussianBlur(mask, (3, 3), 0) # smoth edges
 
-    img_arr[mask_arr] = [0, 0, 0, 0]
+    mask = cv2.bitwise_not(mask) # invert mask to remove specified color
 
-    # turn into PIL Image and return
+    # apply mask to image array
+    img_arr = cv2.bitwise_and(img_arr, img_arr, mask=mask)
+
+    # convert from array to PIL Image and return
     return Image.fromarray(img_arr, "RGBA")
 
 
@@ -109,6 +115,9 @@ class DisplayImage():
             return image
         
         def update_image():
+            # test performance
+            time_start = time.perf_counter()
+
             # get image
             image = get_image()
 
@@ -153,7 +162,7 @@ class DisplayImage():
                 
                 # remove unnecessary portions of the image
                 image = image.filter(ImageFilter.SHARPEN())
-                image = remove_color_range(image, (155, 130, 100), 40)
+                image = remove_color(image, (138, 112, 81), 70)
 
                 new_img = Image.new("RGBA", image.size)
                 new_img.paste(image, mask=cls.mask)
@@ -175,6 +184,10 @@ class DisplayImage():
                         left = 1920 - tk_window.left
                         tk_window.move(left, top)
                         cls.toggle_tk_window = True
+            
+            # test performance
+            time_end = time.perf_counter() - time_start
+            print(f"processing time: {time_end}")
 
             label.after(HUD_UPDATE_DELAY, update_image)
 

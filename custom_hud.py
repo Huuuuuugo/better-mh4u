@@ -8,11 +8,12 @@ import numpy as np
 import psutil
 import cv2
 
-from window_utils import get_citra_window, background_screenshot
+from window_utils import get_citra_window, background_screenshot, get_screen_dimensions
 
 #TODO: end program when citra window is closed
 #TODO: check for changes on the weapon info section along with health and stamina
-#TODO: make it support different screen resolutions
+#TODO: make the script work with cfg or ini files
+#TODO: make it so CUSTOM_SCALE from 'main.py' doesn't affect the size of the hud overlay
 
 # customizable properties
 KEEP_CLOCK_ON_HUD = False   # show quest clock on HUD overlay
@@ -21,6 +22,7 @@ HUD_FPS = 20                # refresh rate of the HUD overlay, a higher refresh 
 
 # constants
 HUD_FRAME_TIME = 1/HUD_FPS
+SCREEN_SCALE = get_screen_dimensions()[1]/1080 # scale factor to keep screen elements on the same proportions between all screen resolutions (default resolution is 1080p)
 
 
 def has_color(image: Image, color: tuple[int, int, int], tolerance: int, section: tuple | None = None):
@@ -82,6 +84,9 @@ class DisplayImage():
     p4_color = (10, 205, 10) # green
     frenzy_color = (175, 80, 210) #purple
 
+    weapon_section = (100, 10, 30, 30)
+    weapon_section = tuple(int(value * SCREEN_SCALE) for value in weapon_section)
+
     # attributes related to the HUD overlay window
     toggle_tk_window = False
     tk_window: gw.Win32Window | None = None
@@ -91,20 +96,19 @@ class DisplayImage():
         mask = Image.open("__status_mask_clock.png")
     else:
         mask = Image.open("__status_mask_clean.png")
-
+    
     # declaration of other needed attributes
-    prev_health_stamina_img = np.array(mask)[10: 10+20, 100:]
-    prev_health_stamina_img = prev_health_stamina_img[:, :, :3]
+    prev_health_stamina_img = []
     hud_timer = 0
 
     @classmethod
     def check_for_player(cls, image):
         # checks if any of the player colors is found within the section that shows the weapon
-        return (has_color(image, cls.p1_combat_color, 30, (100, 10, 30, 30)) or 
-                has_color(image, cls.p2_color, 30, (100, 10, 30, 30)) or
-                has_color(image, cls.p3_spotted_color, 30, (100, 10, 30, 30)) or
-                has_color(image, cls.p4_color, 30, (100, 10, 30, 30)) or
-                has_color(image, cls.frenzy_color, 30, (100, 10, 30, 30)))
+        return (has_color(image, cls.p1_combat_color, 30, cls.weapon_section) or 
+                has_color(image, cls.p2_color, 30, cls.weapon_section) or
+                has_color(image, cls.p3_spotted_color, 30, cls.weapon_section) or
+                has_color(image, cls.p4_color, 30, cls.weapon_section) or
+                has_color(image, cls.frenzy_color, 30, cls.weapon_section))
 
     @classmethod
     def start(cls, window):
@@ -141,11 +145,13 @@ class DisplayImage():
             # test if image contains status hud
             if cls.check_for_player(image):
                 # isolate portion of the image containing health and stamina
-                health_stamina_img = np.array(image)[10: 10+20, 100:]
+                health_stamina_img = np.array(image)[int(10*SCREEN_SCALE): int(10*SCREEN_SCALE+20*SCREEN_SCALE), int(100*SCREEN_SCALE):]
                 
                 # get difference between current and previous health_stamina_img
-                difference = np.all((cls.prev_health_stamina_img != health_stamina_img), axis=-1)
-                difference = np.sum(difference)
+                difference = 0
+                if len(cls.prev_health_stamina_img) == len(health_stamina_img):
+                    difference = np.all((cls.prev_health_stamina_img != health_stamina_img), axis=-1)
+                    difference = np.sum(difference)
 
                 # update previous value
                 cls.prev_health_stamina_img = health_stamina_img
@@ -158,8 +164,8 @@ class DisplayImage():
                     # get window back into view
                     if cls.toggle_tk_window:
                         if cls.tk_window is not None:
-                            top = 605 - cls.tk_window.top
-                            left = 905 - cls.tk_window.left
+                            top = int(605 * SCREEN_SCALE) - cls.tk_window.top
+                            left = int(905 * SCREEN_SCALE) - cls.tk_window.left
                             cls.tk_window.move(left, top)
                             cls.toggle_tk_window = False
                 
@@ -168,8 +174,9 @@ class DisplayImage():
                     # hide window
                     if not cls.toggle_tk_window:
                         if cls.tk_window is not None:
-                            top = 1080 - cls.tk_window.top
-                            left = 1920 - cls.tk_window.left
+                            left, top = get_screen_dimensions()
+                            top -= cls.tk_window.top
+                            left -= cls.tk_window.left
                             cls.tk_window.move(left, top)
                             cls.toggle_tk_window = True
                 
@@ -178,6 +185,8 @@ class DisplayImage():
                 image = remove_color(image, (138, 112, 81), 70)
 
                 new_img = Image.new("RGBA", image.size)
+                if image.size != cls.mask.size:
+                    cls.mask= cls.mask.resize(image.size)
                 new_img.paste(image, mask=cls.mask)
                 image = new_img
 
@@ -191,8 +200,9 @@ class DisplayImage():
                 # hide window
                 if not cls.toggle_tk_window:
                     if cls.tk_window is not None:
-                        top = 1080 - cls.tk_window.top
-                        left = 1920 - cls.tk_window.left
+                        left, top = get_screen_dimensions()
+                        top -= cls.tk_window.top
+                        left -= cls.tk_window.left
                         cls.tk_window.move(left, top)
                         cls.toggle_tk_window = True
 

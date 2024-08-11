@@ -6,10 +6,14 @@ import numpy as np
 import colorama
 import pygame
 
-from window_utils import get_citra_window, set_square_edges
+from window_utils import get_citra_window, set_square_edges, get_screen_dimensions
 
 # customizable properties
-BUTTON_ID = 5   # integer id of the button that brings the secondary window into view (5 is the home button on switch pro controller)
+BUTTON_ID = 5       # integer id of the button that brings the secondary window into view (5 is the home button on switch pro controller)
+CUSTOM_SCALE = 1    # custom scale factor for the dimensions of the secondary window
+
+# constants
+SCREEN_SCALE = get_screen_dimensions()[1]/1080 # scale factor to keep the secondary screen on the same proportions between all screen resolutions (default resolution is 1080p)
 
 colorama.init()
 Fore = colorama.Fore
@@ -48,12 +52,12 @@ if __name__ == "__main__":
         # remove round borders and resize secondary window
         set_square_edges(secondary_window._hWnd)
 
-        height = 550 - secondary_window.height
-        width = 725 - secondary_window.width
-        top = 530 - secondary_window.top
-        left = 0 - secondary_window.left
-
+        height = int((550 * SCREEN_SCALE) * CUSTOM_SCALE) - secondary_window.height
+        width = int((725 * SCREEN_SCALE) * CUSTOM_SCALE) - secondary_window.width
         secondary_window.resize(width, height)
+
+        top = (get_screen_dimensions()[1] - secondary_window.height) - secondary_window.top
+        left = 0 - secondary_window.left
         secondary_window.move(left, top)
 
         # read input from gamepad

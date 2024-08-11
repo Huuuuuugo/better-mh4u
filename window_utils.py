@@ -88,3 +88,8 @@ def background_screenshot(hwnd: int, width: int, height: int, filename: str | No
             img.save(filename)
         return img
     
+def get_screen_dimensions():
+    user32 = ctypes.windll.user32
+    width = user32.GetSystemMetrics(0)
+    height = user32.GetSystemMetrics(1)
+    return width, height

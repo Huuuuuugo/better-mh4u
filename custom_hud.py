@@ -22,8 +22,9 @@ HUD_FPS = 20                # refresh rate of the HUD overlay, a higher refresh 
 
 # constants
 HUD_FRAME_TIME = 1/HUD_FPS
-SCREEN_SCALE = get_screen_dimensions()[1]/1080 # scale factor to keep screen elements on the same proportions between all screen resolutions (default resolution is 1080p)
-
+SCREEN_SCALE_H = get_screen_dimensions()[1]/1080    # scale factor for height; used to correctly position the hud overlay
+SCREEN_SCALE_W = get_screen_dimensions()[0]/1920    # scale factor for width; used to correctly position the hud overlay
+SCREEN_SCALE = min(SCREEN_SCALE_W, SCREEN_SCALE_H)  # commom scale factor; used to keep screen elements on the same proportions between all screen resolutions (default resolution is 1080p)
 
 def has_color(image: Image, color: tuple[int, int, int], tolerance: int, section: tuple | None = None):
     # convert image to RGBA
@@ -164,8 +165,8 @@ class DisplayImage():
                     # get window back into view
                     if cls.toggle_tk_window:
                         if cls.tk_window is not None:
-                            top = int(605 * SCREEN_SCALE) - cls.tk_window.top
-                            left = int(905 * SCREEN_SCALE) - cls.tk_window.left
+                            top = int(605 * SCREEN_SCALE_H) - cls.tk_window.top
+                            left = int(905 * SCREEN_SCALE_W) - cls.tk_window.left
                             cls.tk_window.move(left, top)
                             cls.toggle_tk_window = False
                 

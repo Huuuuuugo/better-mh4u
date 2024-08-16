@@ -13,7 +13,7 @@ BUTTON_ID = 5       # integer id of the button that brings the secondary window 
 CUSTOM_SCALE = 1    # custom scale factor for the dimensions of the secondary window
 
 # constants
-SCREEN_SCALE = get_screen_dimensions()[1]/1080 # scale factor to keep the secondary screen on the same proportions between all screen resolutions (default resolution is 1080p)
+SCREEN_SCALE = min(get_screen_dimensions()[1]/1080, get_screen_dimensions()[0]/1920) # commom scale factor; used to keep screen elements on the same proportions between all screen resolutions (default resolution is 1080p)
 
 colorama.init()
 Fore = colorama.Fore

@@ -115,6 +115,10 @@ class DisplayImage():
     def start(cls, window):
         def get_image():
             # take screenshot
+            if get_citra_window("Janela Secundária") is None:
+                msg = "No MH4U window was found."
+                raise RuntimeError(msg)
+
             image = background_screenshot(window._hWnd, window.width, window.height)
 
             # remove top menu bar
@@ -137,41 +141,68 @@ class DisplayImage():
             return image
         
         def update_image():
-            # start frame timer
-            frame_timer_start = time.perf_counter()
+            try:
+                # start frame timer
+                frame_timer_start = time.perf_counter()
 
-            # get image
-            image = get_image()
+                # get image
+                image = get_image()
 
-            # test if image contains status hud
-            if cls.check_for_player(image):
-                # isolate portion of the image containing health and stamina
-                health_stamina_img = np.array(image)[int(10*SCREEN_SCALE): int(10*SCREEN_SCALE+20*SCREEN_SCALE), int(100*SCREEN_SCALE):]
-                
-                # get difference between current and previous health_stamina_img
-                difference = 0
-                if len(cls.prev_health_stamina_img) == len(health_stamina_img):
-                    difference = np.all((cls.prev_health_stamina_img != health_stamina_img), axis=-1)
-                    difference = np.sum(difference)
+                # test if image contains status hud
+                if cls.check_for_player(image):
+                    # isolate portion of the image containing health and stamina
+                    health_stamina_img = np.array(image)[int(10*SCREEN_SCALE): int(10*SCREEN_SCALE+20*SCREEN_SCALE), int(100*SCREEN_SCALE):]
+                    
+                    # get difference between current and previous health_stamina_img
+                    difference = 0
+                    if len(cls.prev_health_stamina_img) == len(health_stamina_img):
+                        difference = np.all((cls.prev_health_stamina_img != health_stamina_img), axis=-1)
+                        difference = np.sum(difference)
 
-                # update previous value
-                cls.prev_health_stamina_img = health_stamina_img
+                    # update previous value
+                    cls.prev_health_stamina_img = health_stamina_img
 
-                # if the difference is grater than a given threshold
-                if difference > 0:
-                    # restart timer
-                    cls.hud_timer = time.perf_counter()
+                    # if the difference is grater than a given threshold
+                    if difference > 0:
+                        # restart timer
+                        cls.hud_timer = time.perf_counter()
 
-                    # get window back into view
-                    if cls.toggle_tk_window:
-                        if cls.tk_window is not None:
-                            top = int(605 * SCREEN_SCALE_H) - cls.tk_window.top
-                            left = int(905 * SCREEN_SCALE_W) - cls.tk_window.left
-                            cls.tk_window.move(left, top)
-                            cls.toggle_tk_window = False
-                
-                # if there's no significant difference and HIDE_HUD_DELAY has be reached
-                elif (time.perf_counter() - cls.hud_timer) >= HIDE_HUD_DELAY:
+                        # get window back into view
+                        if cls.toggle_tk_window:
+                            if cls.tk_window is not None:
+                                top = int(605 * SCREEN_SCALE_H) - cls.tk_window.top
+                                left = int(905 * SCREEN_SCALE_W) - cls.tk_window.left
+                                cls.tk_window.move(left, top)
+                                cls.toggle_tk_window = False
+                    
+                    # if there's no significant difference and HIDE_HUD_DELAY has be reached
+                    elif (time.perf_counter() - cls.hud_timer) >= HIDE_HUD_DELAY:
+                        # hide window
+                        if not cls.toggle_tk_window:
+                            if cls.tk_window is not None:
+                                left, top = get_screen_dimensions()
+                                top -= cls.tk_window.top
+                                left -= cls.tk_window.left
+                                cls.tk_window.move(left, top)
+                                cls.toggle_tk_window = True
+                    
+                    # remove unnecessary portions of the image
+                    image = image.filter(ImageFilter.SHARPEN())
+                    image = remove_color(image, (138, 112, 81), 70)
+
+                    new_img = Image.new("RGBA", image.size)
+                    if image.size != cls.mask.size:
+                        cls.mask= cls.mask.resize(image.size)
+                    new_img.paste(image, mask=cls.mask)
+                    image = new_img
+
+                    # update tkinter window
+                    tk_image = ImageTk.PhotoImage(image)
+                    label.config(image=tk_image)
+                    label.image = tk_image
+
+                # if image does not contain hud
+                else:
                     # hide window
                     if not cls.toggle_tk_window:
                         if cls.tk_window is not None:
@@ -180,42 +211,21 @@ class DisplayImage():
                             left -= cls.tk_window.left
                             cls.tk_window.move(left, top)
                             cls.toggle_tk_window = True
-                
-                # remove unnecessary portions of the image
-                image = image.filter(ImageFilter.SHARPEN())
-                image = remove_color(image, (138, 112, 81), 70)
 
-                new_img = Image.new("RGBA", image.size)
-                if image.size != cls.mask.size:
-                    cls.mask= cls.mask.resize(image.size)
-                new_img.paste(image, mask=cls.mask)
-                image = new_img
-
-                # update tkinter window
-                tk_image = ImageTk.PhotoImage(image)
-                label.config(image=tk_image)
-                label.image = tk_image
-
-            # if image does not contain hud
-            else:
-                # hide window
-                if not cls.toggle_tk_window:
-                    if cls.tk_window is not None:
-                        left, top = get_screen_dimensions()
-                        top -= cls.tk_window.top
-                        left -= cls.tk_window.left
-                        cls.tk_window.move(left, top)
-                        cls.toggle_tk_window = True
-
-            # wait untill frame timer reaches the frame time of the HUD refresh rate
-            frame_timer_end = time.perf_counter() - frame_timer_start
-            # print(f"\rprocessing time: {round(frame_timer_end, 5):.5f}", end="")
-            while frame_timer_end < HUD_FRAME_TIME:
-                time.sleep(0.0001)
+                # wait untill frame timer reaches the frame time of the HUD refresh rate
                 frame_timer_end = time.perf_counter() - frame_timer_start
-            # print(f" | final time: {round(frame_timer_end, 5):.5f}", end="")
+                # print(f"\rprocessing time: {round(frame_timer_end, 5):.5f}", end="")
+                while frame_timer_end < HUD_FRAME_TIME:
+                    time.sleep(0.0001)
+                    frame_timer_end = time.perf_counter() - frame_timer_start
+                # print(f" | final time: {round(frame_timer_end, 5):.5f}", end="")
 
-            label.after(1, update_image)
+                label.after(1, update_image)
+        
+            except Exception as e:
+                root.destroy()
+                raise e
+    
 
         # Create a new Tkinter window
         root = tk.Tk()

@@ -3,6 +3,7 @@ import time
 import pygetwindow as gw
 import win32gui as w32
 import numpy as np
+import subprocess
 import colorama
 import pygame
 
@@ -78,6 +79,11 @@ if __name__ == "__main__":
         print(Fore.GREEN + "Gamepad found!" + Style.RESET_ALL)
 
         print(Fore.GREEN + "Playing!" + Style.RESET_ALL)
+        # os.system("start /min python custom_hud.py")
+        process = subprocess.Popen(["python", "custom_hud.py"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, bufsize=1, universal_newlines=True)
+        time.sleep(3)
+        primary_window.activate()
+
         while True:
             for event in pygame.event.get():
                 # if a button has been pressed

@@ -112,10 +112,13 @@ class DisplayImage():
                 has_color(image, cls.frenzy_color, 30, cls.weapon_section))
 
     @classmethod
-    def start(cls, window):
+    def start(cls):
         def get_image():
+            # get secondary screen window
+            window: gw.Win32Window = get_citra_window("Janela Secundária")
+
             # take screenshot
-            if get_citra_window("Janela Secundária") is None:
+            if window is None:
                 msg = "No MH4U window was found."
                 raise RuntimeError(msg)
 
@@ -255,7 +258,7 @@ class DisplayImage():
 
         root.mainloop()
 
-if __name__ == "__main__":
+def main():
     # debug thread
     def debug():
         time.sleep(3)
@@ -300,8 +303,9 @@ if __name__ == "__main__":
     # threading.Thread(target=debug, args=(), daemon=True).start()              # start debug thread
     # threading.Thread(target=get_cpu_usage, args=(0.5,), daemon=True).start()  # start cpu usage thread
 
-    # get window
-    window = get_citra_window("Janela Secundária")
+    # start custom hud image display window
+    DisplayImage.start()
 
-    # display image on a separate window
-    DisplayImage.start(window)
+
+if __name__ == "__main__":
+    main()

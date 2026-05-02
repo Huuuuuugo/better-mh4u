@@ -1,8 +1,5 @@
-from PIL import Image, ImageTk
-import tkinter as tk
-import threading
+from PIL import Image
 import ctypes
-import time
 import re
 
 import pygetwindow as gw
@@ -10,6 +7,9 @@ import win32gui
 import win32con
 import win32api
 import win32ui
+
+ctypes.windll.shcore.SetProcessDpiAwareness(1)
+
 
 def get_citra_window(title_ending: str = None):
     """Gets the window object for the corresponding citra window.

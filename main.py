@@ -1,13 +1,13 @@
+import threading
 import time
 
 import pygetwindow as gw
 import win32gui as w32
-import numpy as np
-import subprocess
 import colorama
 import pygame
 
 from window_utils import get_citra_window, set_square_edges, get_screen_dimensions
+import custom_hud
 
 # customizable properties
 BUTTON_ID = 5       # integer id of the button that brings the secondary window into view (5 is the home button on switch pro controller)
@@ -79,10 +79,12 @@ if __name__ == "__main__":
         print(Fore.GREEN + "Gamepad found!" + Style.RESET_ALL)
 
         print(Fore.GREEN + "Playing!" + Style.RESET_ALL)
-        # os.system("start /min python custom_hud.py")
-        process = subprocess.Popen(["python", "custom_hud.py"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, bufsize=1, universal_newlines=True)
+        threading.Thread(target=custom_hud.main, args=(), daemon=True).start() 
         time.sleep(3)
-        primary_window.activate()
+        try:
+            primary_window.activate()
+        except:
+            pass
 
         while True:
             for event in pygame.event.get():
